@@ -323,3 +323,30 @@ class MonitorSeverity(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
+class Integration(str, Enum):
+    """
+        integrations for monitoring and data source
+
+        Attributes:
+        ------------------
+        DATA_SOURCE:
+            Data source
+        MONITORING:
+            Moinitoring
+    """
+    DATA_SOURCE = "DATA_SOURCE",
+    MONITORING = "MONITORING"
+
+class Integration_Type(str, Enum):
+    """
+        type of integrations for monitoring
+
+        Attributes:
+        ------------------
+        SLACK:
+            Slack
+        TEAMS:
+            Microsoft Teams
+    """
+    SLACK = "SLACK",
+    TEAMS = "TEAMS"

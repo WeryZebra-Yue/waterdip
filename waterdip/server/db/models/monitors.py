@@ -46,6 +46,7 @@ class BaseMonitorDB(BaseModel):
     last_run: Optional[datetime]
     created_at: datetime
     severity: MonitorSeverity = Field(default=MonitorSeverity.LOW)
+    integration_id: Optional[UUID]
 
     def dict(self, *args, **kwargs) -> "DictStrAny":
         monitor = super().dict(*args, **kwargs)
@@ -56,6 +57,8 @@ class BaseMonitorDB(BaseModel):
         monitor["monitor_identification"]["model_id"] = str(
             monitor["monitor_identification"]["model_id"]
         )
+        if monitor.get("integration_id"):
+            monitor["integration_id"] = str(monitor["integration_id"])
 
         return monitor
 

@@ -65,3 +65,21 @@ class EntityNotFoundError(WDServerError):
         self.name = name
         self.type = type if isinstance(type, str) else type.__name__
         self.message = message
+
+class EntityAlreadyExistsError(WDServerError):
+    """ Error raised when entity already exists """
+    
+    HTTP_STATUS = status.HTTP_409_CONFLICT
+
+    def __init__(self, name: str,  message: str = None):
+        self.name = name
+        self.message = message
+        
+class IntegrationError(WDServerError):
+    """Error raised when integration fails"""
+
+    HTTP_STATUS = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def __init__(self, name: str, message: str = None):
+        self.name = name
+        self.message = message

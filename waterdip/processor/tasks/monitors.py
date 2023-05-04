@@ -23,6 +23,8 @@ from waterdip.server.db.mongodb import MongodbBackend
 from waterdip.server.db.repositories.alert_repository import AlertRepository
 from waterdip.server.db.repositories.dataset_repository import DatasetRepository
 from waterdip.server.db.repositories.monitor_repository import MonitorRepository
+from waterdip.server.db.repositories.integration_repository import IntegrationRepository
+from waterdip.server.services.integration_service import IntegrationService
 
 
 @celery_app.task(name="process_monitor", bind=True)
@@ -38,6 +40,9 @@ def process_monitor(self, monitor):
         mongodb_backend=mongo_backend,
         alert_repo=AlertRepository.get_instance(mongodb=mongo_backend),
         dataset_repo=DatasetRepository.get_instance(mongodb=mongo_backend),
+        integration_service=IntegrationService.get_instance(
+            repository=IntegrationRepository.get_instance(mongodb=mongo_backend)
+        )
     )
     processor.process()
 

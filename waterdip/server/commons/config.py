@@ -33,6 +33,7 @@ class ServerSettings(BaseSettings):
     mongo_collection_event_rows: str = "wd_dataset_event_rows"
     mongo_collection_monitors: str = "wd_monitors"
     mongo_collection_alerts: str = "wd_alerts"
+    mongo_collection_integrations: str = "wd_integrations"
 
     docs_enabled: bool = True
     is_testing: str = "false"

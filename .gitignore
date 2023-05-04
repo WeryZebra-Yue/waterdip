@@ -118,6 +118,9 @@ processor/runnotebook.ipynb
 # Ignore DevSpace cache and log folder
 .devspace/
 
+# Poetry
+poetry.lock
+
 # OSX
 .DS_Store
 *.db

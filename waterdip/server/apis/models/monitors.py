@@ -47,6 +47,7 @@ class CreateMonitorRequest(BaseModel):
     monitor_type: MonitorType
     monitor_condition: BaseMonitorCondition
     severity: MonitorSeverity
+    integration_id: Optional[UUID]
 
 
 class CreateMonitorResponse(ServiceBaseMonitor):
@@ -81,6 +82,7 @@ class MonitorListRow(BaseModel):
     last_run: Optional[datetime]
     created_at: datetime
     severity: MonitorSeverity
+    integration_id: Optional[UUID]
 
 
 class MonitorListResponse(BaseModel):

@@ -108,6 +108,7 @@ class MonitorService:
         identification: MonitorIdentification,
         condition: BaseMonitorCondition,
         severity: MonitorSeverity,
+        integration_id: Optional[List[UUID]] = None,
     ) -> ServiceBaseMonitor:
         self._check_monitor_identification(identification)
 
@@ -126,6 +127,7 @@ class MonitorService:
             ),
             severity=severity,
             created_at=datetime.utcnow(),
+            integration_id=integration_id,
         )
 
         return self._repository.insert_monitor(monitor=service_quality_monitor)
@@ -136,6 +138,7 @@ class MonitorService:
         identification: MonitorIdentification,
         condition: BaseMonitorCondition,
         severity: MonitorSeverity,
+        integration_id: Optional[List[UUID]] = None,
     ) -> ServiceBaseMonitor:
         self._check_monitor_identification(identification)
 
@@ -153,6 +156,7 @@ class MonitorService:
             ),
             created_at=datetime.utcnow(),
             severity=severity,
+            integration_id=integration_id,
         )
 
         return self._repository.insert_monitor(monitor=service_perf_monitor)
@@ -163,6 +167,7 @@ class MonitorService:
         identification: MonitorIdentification,
         condition: BaseMonitorCondition,
         severity: MonitorSeverity,
+        integration_id: Optional[List[UUID]] = None,
     ) -> ServiceBaseMonitor:
         self._check_monitor_identification(identification)
 
@@ -182,6 +187,7 @@ class MonitorService:
             ),
             created_at=datetime.utcnow(),
             severity=severity,
+            integration_id=integration_id,
         )
 
         return self._repository.insert_monitor(monitor=service_drift_monitor)

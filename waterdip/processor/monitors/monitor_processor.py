@@ -32,6 +32,7 @@ from waterdip.server.db.mongodb import (
 )
 from waterdip.server.db.repositories.alert_repository import AlertRepository
 from waterdip.server.db.repositories.dataset_repository import DatasetRepository
+from waterdip.server.services.integration_service import IntegrationService
 from waterdip.server.errors.base_errors import EntityNotFoundError
 
 
@@ -52,6 +53,7 @@ class MonitorProcessor:
         mongodb_backend: MongodbBackend,
         alert_repo: AlertRepository,
         dataset_repo: DatasetRepository,
+        integration_service : IntegrationService
     ):
         self.monitor_type: MonitorType = MonitorType(monitor["monitor_type"])
         self._mongo_backend = mongodb_backend
@@ -61,10 +63,12 @@ class MonitorProcessor:
         self.monitor_id = monitor["monitor_id"]
         self._model_version_id = monitor["monitor_identification"]["model_version_id"]
         self.model_id = monitor["monitor_identification"]["model_id"]
+        self.integration_id = monitor["integration_id"]
         if self.monitor_type == MonitorType.DATA_QUALITY:
             self.monitor_condition = DataQualityBaseMonitorCondition(
                 **monitor["monitor_condition"]
             )
+        self._integration_service = integration_service
 
     def _data_quality_processor(self) -> List[Dict]:
         """
@@ -148,7 +152,13 @@ class MonitorProcessor:
                     "focal_time_window": self.monitor_condition.evaluation_window,
                     "focal_value": violation["metric_value"],
                 }
-                self._create_alert(_violation)
+                alert = self._create_alert(_violation)
+                if self.integration_id:
+                    self._integration_service.send_alert(
+                        alert=alert,
+                        monitor_condition=self.monitor_condition,
+                        integration_id=self.integration_id,
+                    )
 
         self._database[MONGO_COLLECTION_MONITORS].update_one(
             {"monitor_id": self.monitor_id},
