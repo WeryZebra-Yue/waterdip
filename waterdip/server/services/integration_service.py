@@ -14,6 +14,8 @@
 
 from typing import Dict, List
 from uuid import UUID, uuid4
+import urllib3
+import json
 
 from fastapi import Depends
 from waterdip.server.db.repositories.integration_repository import IntegrationRepository
@@ -23,6 +25,29 @@ from waterdip.server.errors.base_errors import IntegrationError
 from waterdip.server.db.models.alerts import BaseAlertDB
 from waterdip.server.db.models.monitors import BaseMonitorCondition
 from slack_sdk import WebClient
+
+class TeamsConnectorCard:
+    def __init__(self, hookurl, http_timeout=60):
+        self.http = urllib3.PoolManager()
+        self.payload = {}
+        self.hookurl = hookurl
+        self.http_timeout = http_timeout
+
+    def text(self, mtext):
+        self.payload["text"] = mtext
+        return self
+
+    def send(self):
+        headers = {"Content-Type":"application/json"}
+        r = self.http.request(
+                'POST',
+                f'{self.hookurl}',
+                body=json.dumps(self.payload).encode('utf-8'),
+                headers=headers, timeout=self.http_timeout)
+        if r.status == 200: 
+            pass
+        else:
+            r.raise_for_status()
 
 class IntegrationService:
     _INSTANCE: "IntegrationService" = None
@@ -40,6 +65,7 @@ class IntegrationService:
         repository: IntegrationRepository,
     ):
         self._repository = repository
+
     def add_integration(self,
         integration: Integration,
         app_name: str,
@@ -54,6 +80,7 @@ class IntegrationService:
             app_name=app_name,
             configuration=configuration,
         )
+        
         if integration.integration == Integration.MONITORING:
             if integration.configuration["type"] == Integration_Type.SLACK:
                 self.send_message_to_slack(
@@ -61,11 +88,17 @@ class IntegrationService:
                     channel=integration.configuration["channel"],
                     token=integration.configuration["token"],
                 )
+            elif integration.configuration["type"] == Integration_Type.TEAMS:
+                self.send_message_to_teams(
+                    webhook_url=integration.configuration["webhook_url"],
+                    message="Hello from your app! :tada:",
+                )
             else:
                 raise NotImplementedError()
         return self._repository.add_integration(
             integration=integration
         )
+    
     def delete_integration(self, integration_id: UUID):
         """
         Delete a integration from the database
@@ -90,11 +123,28 @@ class IntegrationService:
             ) 
         except Exception as e:
             raise IntegrationError(name=Integration_Type.SLACK,  message=str(e))
+
+
+    def send_message_to_teams(self, webhook_url: str, message: str):
+        """
+        - Send a teams notification to the desired webhook_url
+            - webhook_url : the url you got from the teams webhook configuration
+            - message : your formatted notification content
+        """
+        myTeamsMessage = TeamsConnectorCard(webhook_url)
+        myTeamsMessage.text(message)
+        try:
+            myTeamsMessage.send()
+        except Exception as e:
+            raise IntegrationError(name=Integration_Type.TEAMS,  message=str(e))
+        
+        
     def get_integration(self, integration_id: UUID):
         """
         Get a integration from the database
         """
         return self._repository.get_integration(integration_id=str(integration_id))
+    
     def send_alert(self, alert : BaseAlertDB, monitor_condition : BaseMonitorCondition, integration_id: UUID):
         integration = self.get_integration(integration_id=integration_id)
         if integration.configuration["type"] == Integration_Type.SLACK:
@@ -102,6 +152,11 @@ class IntegrationService:
                 message=self.alert_description(alert=alert, monitor_condition=monitor_condition),
                 channel=integration.configuration["channel"],
                 token=integration.configuration["token"],
+            )
+        elif integration.configuration["type"] == Integration_Type.TEAMS:
+            self.send_message_to_teams(
+                webhook_url=integration.configuration["webhook_url"],
+                message=self.alert_description(alert=alert, monitor_condition=monitor_condition),
             )
 
     def alert_description(self, alert : BaseAlertDB, monitor_condition : BaseMonitorCondition):
