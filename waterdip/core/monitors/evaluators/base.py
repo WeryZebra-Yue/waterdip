@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from abc import ABC, abstractmethod
+from typing import List, Union
 
 from waterdip.core.metrics.base import MongoMetric
 from waterdip.core.monitors.models import MonitorCondition
@@ -21,9 +22,13 @@ from waterdip.core.monitors.models import MonitorCondition
 class MonitorEvaluator(ABC):
     """ """
 
-    def __init__(self, monitor_condition: MonitorCondition, metric: MongoMetric):
+    def __init__(
+        self,
+        monitor_condition: MonitorCondition,
+        metrics: Union[List[MongoMetric], MongoMetric],
+    ):
         self.monitor_condition = monitor_condition
-        self.metric = metric
+        self.metrics = metrics
 
     @abstractmethod
     def evaluate(self, **kwargs) -> bool:

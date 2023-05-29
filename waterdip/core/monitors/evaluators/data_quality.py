@@ -14,12 +14,16 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from loguru import logger
 
 from waterdip.core.commons.models import TimeRange
-from waterdip.core.metrics.data_metrics import CountEmptyHistogram, DataMetrics
+from waterdip.core.metrics.data_metrics import (
+    CountEmptyHistogram,
+    DataMetrics,
+    UniqueValueCountHistogram,
+)
 from waterdip.core.monitors.evaluators.base import MonitorEvaluator
 from waterdip.core.monitors.models import DataQualityBaseMonitorCondition
 
@@ -28,7 +32,9 @@ class DataQualityMonitorEvaluator(MonitorEvaluator, ABC):
     """ """
 
     def __init__(
-        self, monitor_condition: DataQualityBaseMonitorCondition, metrics: DataMetrics
+        self,
+        monitor_condition: DataQualityBaseMonitorCondition,
+        metrics: Union[List[DataMetrics], DataMetrics],
     ):
         super().__init__(monitor_condition, metrics)
 
@@ -45,9 +51,15 @@ class DataQualityMonitorEvaluator(MonitorEvaluator, ABC):
         threshold_type, threshold_value = threshold.threshold, threshold.value
         if threshold_type == "gt":
             if value > threshold_value:
+                logger.debug(
+                    f"Value : [{value}] is greater than threshold : [{threshold_value}]"
+                )
                 return True
         elif threshold_type == "lt":
             if value < threshold_value:
+                logger.debug(
+                    f"Value : [{value}] is less than threshold : [{threshold_value}]"
+                )
                 return True
         return False
 
@@ -77,7 +89,7 @@ class EmptyValueEvaluator(DataQualityMonitorEvaluator):
 
     def _get_metrics(self, **kwargs) -> Dict[str, Any]:
         evaluation_window = self._get_evaluation_window_timerange()
-        return self.metric.aggregation_result(time_range=evaluation_window)
+        return self.metrics.aggregation_result(time_range=evaluation_window)
 
     def evaluate(self, **kwargs) -> List[Dict]:
         empties = self._get_metrics()
@@ -92,6 +104,86 @@ class EmptyValueEvaluator(DataQualityMonitorEvaluator):
                     violations.append(
                         {
                             "metric_value": empty,
+                            "threshold": self.monitor_condition.threshold,
+                            "dimension": col,
+                        }
+                    )
+        return violations
+
+
+class NewValueEvaluator(DataQualityMonitorEvaluator):
+    def __init__(
+        self,
+        monitor_condition: DataQualityBaseMonitorCondition,
+        metrics: List[UniqueValueCountHistogram],
+    ):
+        super().__init__(monitor_condition, metrics)
+
+    def _get_metrics(self, **kwargs) -> Dict[str, Any]:
+        evaluation_window = self._get_evaluation_window_timerange()
+        return (
+            self.metrics["baseline_metric"].aggregation_result(
+                time_range=evaluation_window
+            ),
+            self.metrics["production_metric"].aggregation_result(
+                time_range=evaluation_window
+            ),
+        )
+
+    def evaluate(self, **kwargs):
+        baseline, production = self._get_metrics()
+        violations: List[Dict] = []
+        for col in self._get_columns():
+            baseline_count = baseline.get(col)
+            production_count = production.get(col)
+            if baseline_count and production_count:
+                violation = self._does_violate_threshold(
+                    abs(production_count - baseline_count)
+                )
+                if violation is True:
+                    violations.append(
+                        {
+                            "metric_value": abs(production_count - baseline_count),
+                            "threshold": self.monitor_condition.threshold,
+                            "dimension": col,
+                        }
+                    )
+        return violations
+
+
+class MissingValueEvaluator(DataQualityMonitorEvaluator):
+    def __init__(
+        self,
+        monitor_condition: DataQualityBaseMonitorCondition,
+        metrics: List[UniqueValueCountHistogram],
+    ):
+        super().__init__(monitor_condition, metrics)
+
+    def _get_metrics(self, **kwargs) -> Dict[str, Any]:
+        evaluation_window = self._get_evaluation_window_timerange()
+        return (
+            self.metrics["baseline_metric"].aggregation_result(
+                time_range=evaluation_window
+            ),
+            self.metrics["production_metric"].aggregation_result(
+                time_range=evaluation_window
+            ),
+        )
+
+    def evaluate(self, **kwargs):
+        baseline, production = self._get_metrics()
+        violations: List[Dict] = []
+        for col in self._get_columns():
+            baseline_count = baseline.get(col)
+            production_count = production.get(col)
+            if baseline_count and production_count:
+                violation = self._does_violate_threshold(
+                    abs(baseline_count - production_count)
+                )
+                if violation is True:
+                    violations.append(
+                        {
+                            "metric_value": abs(baseline_count - production_count),
                             "threshold": self.monitor_condition.threshold,
                             "dimension": col,
                         }

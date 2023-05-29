@@ -19,13 +19,26 @@ from uuid import UUID
 
 from loguru import logger
 
-from waterdip.core.commons.models import DataQualityMetric, DatasetType, MonitorType
-from waterdip.core.metrics.data_metrics import CountEmptyHistogram
-from waterdip.core.monitors.evaluators.data_quality import EmptyValueEvaluator
+from waterdip.core.commons.models import (
+    DataQualityMetric,
+    DatasetType,
+    Environment,
+    MonitorType,
+)
+from waterdip.core.metrics.data_metrics import (
+    CountEmptyHistogram,
+    UniqueValueCountHistogram,
+)
+from waterdip.core.monitors.evaluators.data_quality import (
+    EmptyValueEvaluator,
+    MissingValueEvaluator,
+    NewValueEvaluator,
+)
 from waterdip.core.monitors.models import DataQualityBaseMonitorCondition
 from waterdip.server.db.models.alerts import AlertDB, AlertIdentification, BaseAlertDB
 from waterdip.server.db.models.datasets import BaseDatasetDB
 from waterdip.server.db.mongodb import (
+    MONGO_COLLECTION_BATCH_ROWS,
     MONGO_COLLECTION_EVENT_ROWS,
     MONGO_COLLECTION_MONITORS,
     MongodbBackend,
@@ -80,11 +93,42 @@ class MonitorProcessor:
                 monitor_condition=self.monitor_condition,
                 metric=CountEmptyHistogram(
                     collection=self._database[MONGO_COLLECTION_EVENT_ROWS],
-                    dataset_id=self._get_event_dataset().dataset_id,
+                    dataset_id=self._get_event_dataset(),
                 ),
             )
-        else:
-            raise NotImplementedError()
+        elif (
+            self.monitor_condition.evaluation_metric == DataQualityMetric.MISSING_VALUE
+        ):
+            event_datasets = self._get_event_dataset()
+            evaluator = MissingValueEvaluator(
+                monitor_condition=self.monitor_condition,
+                metrics={
+                    "baseline_metric": UniqueValueCountHistogram(
+                        collection=self._database[MONGO_COLLECTION_BATCH_ROWS],
+                        dataset_id=self._get_batch_dataset().dataset_id,
+                    ),
+                    "production_metric": UniqueValueCountHistogram(
+                        collection=self._database[MONGO_COLLECTION_EVENT_ROWS],
+                        dataset_id=self._get_event_dataset().dataset_id,
+                    ),
+                },
+            )
+        elif self.monitor_condition.evaluation_metric == DataQualityMetric.NEW_VALUE:
+            logger.info("New value evaluator")
+            event_datasets = self._get_event_dataset()
+            evaluator = NewValueEvaluator(
+                monitor_condition=self.monitor_condition,
+                metrics={
+                    "baseline_metric": UniqueValueCountHistogram(
+                        collection=self._database[MONGO_COLLECTION_BATCH_ROWS],
+                        dataset_id=self._get_batch_dataset().dataset_id,
+                    ),
+                    "production_metric": UniqueValueCountHistogram(
+                        collection=self._database[MONGO_COLLECTION_EVENT_ROWS],
+                        dataset_id=self._get_event_dataset().dataset_id,
+                    ),
+                },
+            )
 
         return evaluator.evaluate()
 
@@ -104,6 +148,23 @@ class MonitorProcessor:
             )
 
         return event_dataset[0]
+
+    def _get_batch_dataset(self) -> Union[BaseDatasetDB, None]:
+        """
+        Get batch dataset for the model version id
+        """
+        batch_dataset: List[BaseDatasetDB] = self._dataset_repo.find_datasets(
+            filters={
+                "model_version_id": self._model_version_id,
+                "dataset_type": DatasetType.BATCH,
+            }
+        )
+        if not batch_dataset:
+            raise EntityNotFoundError(
+                type="batch_dataset", name=str(self._model_version_id)
+            )
+
+        return batch_dataset[0]
 
     def _create_alert(self, violation: Dict) -> AlertDB:
         alert = BaseAlertDB(

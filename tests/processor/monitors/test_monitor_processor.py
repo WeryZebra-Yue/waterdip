@@ -46,15 +46,17 @@ class TestMonitorProcessor:
     ):
         mocker.patch(
             "waterdip.processor.monitors.monitor_processor.MonitorProcessor._get_event_dataset",
-            return_value=BaseDatasetDB(
-                dataset_id=uuid.uuid4(),
-                dataset_name="name",
-                environment=Environment.PRODUCTION,
-                created_at=datetime.datetime.now(),
-                dataset_type=DatasetType.EVENT,
-                model_id=uuid.uuid4(),
-                model_version_id=uuid.uuid4(),
-            ),
+            return_value=[
+                BaseDatasetDB(
+                    dataset_id=uuid.uuid4(),
+                    dataset_name="name",
+                    environment=Environment.PRODUCTION,
+                    created_at=datetime.datetime.now(),
+                    dataset_type=DatasetType.EVENT,
+                    model_id=uuid.uuid4(),
+                    model_version_id=uuid.uuid4(),
+                )
+            ],
         )
         mocker.patch(
             "waterdip.core.metrics.data_metrics.CountEmptyHistogram.aggregation_result",

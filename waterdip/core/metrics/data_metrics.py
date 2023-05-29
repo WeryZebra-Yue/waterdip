@@ -711,3 +711,59 @@ class NumericBasicMetrics(DataMetrics):
             },
             {"$facet": facets},
         ]
+
+
+class UniqueValueCountHistogram(DataMetrics):
+    @property
+    def metric_name(self) -> str:
+        return "unique_value_count_hist"
+
+    def aggregation_result(
+        self, time_range: TimeRange = None, **kwargs
+    ) -> Dict[str, Any]:
+        hist: Dict[str, Any] = {}
+        agg_query = self._aggregation_query(
+            time_filter=self._time_filter_builder(time_range=time_range), **kwargs
+        )
+        for doc in self._collection.aggregate(agg_query):
+            column_name = doc["_id"]
+            column_value = doc["count"]
+            hist[column_name] = column_value
+        return hist
+
+    def _aggregation_query(self, time_filter: Dict = None) -> List[Dict[str, Any]]:
+        return [
+            {
+                "$match": {
+                    "dataset_id": str(self._dataset_id),
+                    **(time_filter if time_filter is not None else {}),
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$columns'
+             }
+            }, 
+            {
+                '$match': {
+                    '$or': [
+                        {
+                            'columns.value_numeric': {
+                                '$ne': None
+                            }
+                        }, {
+                            'columns.value_categorical': {
+                                '$ne': None
+                            }
+                        }
+                    ]
+                }
+            }, {
+                '$group': {
+                    '_id': '$columns.name',
+                    'count': {
+                        '$sum': 1
+                    }
+                }
+            }
+        ]
